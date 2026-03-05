@@ -40,8 +40,8 @@
   .btn-reset:hover{background:rgba(255,80,80,0.18)}
   .loading-bar{height:3px;background:linear-gradient(90deg,var(--purple),var(--cyan));border-radius:2px;animation:slide 1.2s infinite}
   @keyframes slide{0%{margin-left:0;width:30%}50%{margin-left:40%;width:40%}100%{margin-left:100%;width:0}}
-  .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
-  @media(max-width:600px){.stats-grid{grid-template-columns:repeat(2,1fr)}}
+  .stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px}
+  @media(max-width:700px){.stats-grid{grid-template-columns:repeat(2,1fr)}}
   .stat-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center}
   .stat-val{font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace}
   .stat-label{font-size:10px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:1px}
@@ -264,6 +264,8 @@ function parsePKL(wb) {
         if (/Item\s*Num|Item\s*No\.?$/i.test(s) && !pc.itemNo)         pc.itemNo = i;
         if (/^Qty$|^Quantity$/i.test(s) && !pc.qty)                       pc.qty = i;
         if (/^NW/i.test(s) && !/GW/i.test(s) && !pc.nw)                  pc.nw = i;
+        if (/^GW/i.test(s) && !pc.gw)                                     pc.gw = i;
+        if (/SO_Carton|Combine_SO|^Combine$/i.test(s) && !pc.cartonId)    pc.cartonId = i;
         if (/Original\s*Country/i.test(s) && !pc.country)                pc.country = i;
       });
       const pklHeaderDump = strs.filter(s=>s).map(s=>s.replace(/\n/g,'↵')).join(' | ');
@@ -296,7 +298,9 @@ function parsePKL(wb) {
         const country = pc.country != null ? String(r2[pc.country] ?? '').trim() : '';
         const key2    = seNoINV + '_' + String(desc).trim() + '_' + aeSlot + '_' + slot4;
 
-        data.push({ desc: String(desc).trim(), qty, nw, seNoINV, key2, country });
+        const gw       = parseFloat(r2[pc.gw]) || 0;
+        const cartonId = pc.cartonId != null ? String(r2[pc.cartonId] ?? '').trim() : '';
+        data.push({ desc: String(desc).trim(), qty, nw, gw, cartonId, seNoINV, key2, country });
       }
       debug.push('PKL rows=' + data.length);
       return { data, debug };
@@ -336,6 +340,14 @@ function computeOutput(invResult, pklResult) {
     debug.push('Sample INV Key2: ' + sampleINV);
     throw new Error('Không match được INV ↔ PKL\n\n' + debug.join('\n'));
   }
+
+  // Total cartons (unique cartonId) and GW (sum per unique carton)
+  const seenCartons = {};
+  pklResult.data.forEach(r => {
+    if (r.cartonId && !seenCartons[r.cartonId]) seenCartons[r.cartonId] = r.gw;
+  });
+  const totalCartons = Object.keys(seenCartons).length;
+  const totalGW = Object.values(seenCartons).reduce((s, v) => s + v, 0);
 
   const rows = Object.entries(outputMap).map(([key1, agg]) => {
     const parts     = key1.split('@');
@@ -443,11 +455,13 @@ async function processFiles() {
     const totalTriGia  = rows.reduce((s,r) => s + r.qty * r.unitPrice, 0);
     const missingBcct  = rows.filter(r => !r.hasBcct);
 
+    const { totalCartons, totalGW } = output;
     const statsHtml = `<div class="stats-grid">
-      <div class="stat-card c-purple"><div class="stat-val">${invData_merged.length}</div><div class="stat-label">INV rows (${invFiles.length} file)</div></div>
-      <div class="stat-card c-cyan"><div class="stat-val">${pklData_merged.length}</div><div class="stat-label">PKL rows (${pklFiles.length} file)</div></div>
-      <div class="stat-card c-yellow"><div class="stat-val">${rows.length}</div><div class="stat-label">Mặt hàng</div></div>
-      <div class="stat-card c-green"><div class="stat-val">${totalQty.toLocaleString()}</div><div class="stat-label">Tổng Qty</div></div>
+      <div class="stat-card c-purple"><div class="stat-val">${rows.length}</div><div class="stat-label">Mặt hàng</div></div>
+      <div class="stat-card c-cyan"><div class="stat-val">${totalQty.toLocaleString()}</div><div class="stat-label">Tổng Qty (ROL)</div></div>
+      <div class="stat-card c-yellow"><div class="stat-val">${totalNW.toFixed(2)}</div><div class="stat-label">Total NW (KG)</div></div>
+      <div class="stat-card c-green"><div class="stat-val">${totalGW.toFixed(2)}</div><div class="stat-label">Total GW (KG)</div></div>
+      <div class="stat-card c-purple"><div class="stat-val">${totalCartons}</div><div class="stat-label">Total Carton</div></div>
     </div>`;
 
     const debugHtml = `<div class="debug-box">🔍 Debug:
