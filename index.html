@@ -40,8 +40,8 @@
   .btn-reset:hover{background:rgba(255,80,80,0.18)}
   .loading-bar{height:3px;background:linear-gradient(90deg,var(--purple),var(--cyan));border-radius:2px;animation:slide 1.2s infinite}
   @keyframes slide{0%{margin-left:0;width:30%}50%{margin-left:40%;width:40%}100%{margin-left:100%;width:0}}
-  .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
-  @media(max-width:600px){.stats-grid{grid-template-columns:repeat(2,1fr)}}
+  .stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px}
+  @media(max-width:700px){.stats-grid{grid-template-columns:repeat(2,1fr)}}
   .stat-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center}
   .stat-val{font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace}
   .stat-label{font-size:10px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:1px}
@@ -264,6 +264,8 @@ function parsePKL(wb) {
         if (/Item\s*Num|Item\s*No\.?$/i.test(s) && !pc.itemNo)         pc.itemNo = i;
         if (/^Qty$|^Quantity$/i.test(s) && !pc.qty)                       pc.qty = i;
         if (/^NW/i.test(s) && !/GW/i.test(s) && !pc.nw)                  pc.nw = i;
+        if (/^GW/i.test(s) && !pc.gw)                                     pc.gw = i;
+        if (/SO_Carton|Combine_SO|^Combine$/i.test(s) && !pc.cartonId)    pc.cartonId = i;
         if (/Original\s*Country/i.test(s) && !pc.country)                pc.country = i;
       });
       const pklHeaderDump = strs.filter(s=>s).map(s=>s.replace(/\n/g,'↵')).join(' | ');
@@ -296,10 +298,49 @@ function parsePKL(wb) {
         const country = pc.country != null ? String(r2[pc.country] ?? '').trim() : '';
         const key2    = seNoINV + '_' + String(desc).trim() + '_' + aeSlot + '_' + slot4;
 
-        data.push({ desc: String(desc).trim(), qty, nw, seNoINV, key2, country });
+        const gw       = parseFloat(r2[pc.gw]) || 0;
+        const cartonId = pc.cartonId != null ? String(r2[pc.cartonId] ?? '').trim() : '';
+        data.push({ desc: String(desc).trim(), qty, nw, gw, cartonId, seNoINV, key2, country });
       }
       debug.push('PKL rows=' + data.length);
-      return { data, debug };
+
+      // Read TOTAL CARTON and GROSS WEIGHT directly from summary rows
+      // Pattern: row has 'TOTAL' and 'CARTON' as separate cells → number is between them
+      //          row has 'GROSS WEIGHT' as a cell → number is next non-empty cell
+      let totalCartons = 0, totalGW = 0;
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i]; if (!r) continue;
+        const strs = r.map(c => c != null ? String(c).trim().toUpperCase() : '');
+
+        // Find TOTAL...number...CARTON on same row
+        const rowText = strs.join(' ');
+        if (rowText.includes('TOTAL') && rowText.includes('CARTON') && !rowText.includes('GROSS')) {
+          debug.push('CARTON ROW raw: ' + JSON.stringify(r));
+          for (let j = 0; j < r.length; j++) {
+            const v = parseFloat(r[j]);
+            if (!isNaN(v) && v > 0 && r[j] !== null && r[j] !== undefined && String(r[j]).trim() !== '') { 
+              totalCartons += v; 
+              debug.push('CARTON found: ' + v);
+              break; 
+            }
+          }
+        }
+
+        // Find GROSS WEIGHT row
+        if (rowText.includes('GROSS') && rowText.includes('WEIGHT')) {
+          debug.push('GW ROW raw: ' + JSON.stringify(r));
+          for (let j = 0; j < r.length; j++) {
+            const v = parseFloat(r[j]);
+            if (!isNaN(v) && v > 0 && r[j] !== null && r[j] !== undefined && String(r[j]).trim() !== '') { 
+              totalGW += v; 
+              debug.push('GW found: ' + v);
+              break; 
+            }
+          }
+        }
+      }
+
+      return { data, totalCartons, totalGW, debug };
     }
   }
   throw new Error('PKL: Không tìm thấy header\nSheets: ' + wb.SheetNames.join(', '));
@@ -337,6 +378,10 @@ function computeOutput(invResult, pklResult) {
     throw new Error('Không match được INV ↔ PKL\n\n' + debug.join('\n'));
   }
 
+  // Total cartons and GW — read directly from PKL summary rows
+  const totalCartons = pklResult.totalCartons || 0;
+  const totalGW = pklResult.totalGW || 0;
+
   const rows = Object.entries(outputMap).map(([key1, agg]) => {
     const parts     = key1.split('@');
     const desc      = parts[0].trim();
@@ -356,6 +401,8 @@ function computeOutput(invResult, pklResult) {
     rows,
     totalQty: rows.reduce((s,r) => s+r.qty, 0),
     totalNW:  rows.reduce((s,r) => s+r.netWeight, 0),
+    totalCartons,
+    totalGW,
     debug
   };
 }
@@ -427,14 +474,17 @@ async function processFiles() {
     // Parse all PKL files → merge
     const pklData_merged = [];
     const pklDebug = [];
+    let pklTotalCartons = 0, pklTotalGW = 0;
     for (const f of pklFiles) {
       const buf = await readBuf(f);
       const wb  = XLSX.read(buf, { type:'array' });
       const res = parsePKL(wb);
       pklDebug.push(...res.debug);
       pklData_merged.push(...res.data);
+      pklTotalCartons += res.totalCartons || 0;
+      pklTotalGW      += res.totalGW      || 0;
     }
-    const pklResult = { data: pklData_merged, debug: pklDebug };
+    const pklResult = { data: pklData_merged, debug: pklDebug, totalCartons: pklTotalCartons, totalGW: pklTotalGW };
 
     const output = computeOutput(invResult, pklResult);
     lastResult = output;
@@ -443,11 +493,13 @@ async function processFiles() {
     const totalTriGia  = rows.reduce((s,r) => s + r.qty * r.unitPrice, 0);
     const missingBcct  = rows.filter(r => !r.hasBcct);
 
+    const { totalCartons = 0, totalGW = 0 } = output;
     const statsHtml = `<div class="stats-grid">
-      <div class="stat-card c-purple"><div class="stat-val">${invData_merged.length}</div><div class="stat-label">INV rows (${invFiles.length} file)</div></div>
-      <div class="stat-card c-cyan"><div class="stat-val">${pklData_merged.length}</div><div class="stat-label">PKL rows (${pklFiles.length} file)</div></div>
-      <div class="stat-card c-yellow"><div class="stat-val">${rows.length}</div><div class="stat-label">Mặt hàng</div></div>
-      <div class="stat-card c-green"><div class="stat-val">${totalQty.toLocaleString()}</div><div class="stat-label">Tổng Qty</div></div>
+      <div class="stat-card c-purple"><div class="stat-val">${rows.length}</div><div class="stat-label">Mặt hàng</div></div>
+      <div class="stat-card c-cyan"><div class="stat-val">${totalQty.toLocaleString()}</div><div class="stat-label">Tổng Qty (ROL)</div></div>
+      <div class="stat-card c-yellow"><div class="stat-val">${(totalNW||0).toFixed(2)}</div><div class="stat-label">Total NW (KG)</div></div>
+      <div class="stat-card c-green"><div class="stat-val">${(totalGW||0).toFixed(2)}</div><div class="stat-label">Total GW (KG)</div></div>
+      <div class="stat-card c-purple"><div class="stat-val">${totalCartons}</div><div class="stat-label">Total Carton</div></div>
     </div>`;
 
     const debugHtml = `<div class="debug-box">🔍 Debug:
