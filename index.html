@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Những Thứ ZôTri</title>
+<title>A&E Vietnam — INV/PKL Processor</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
@@ -67,12 +67,6 @@
   .error-box{background:rgba(255,80,80,0.08);border:1px solid rgba(255,80,80,0.3);border-radius:10px;padding:14px 18px;color:#ff9090;font-family:'JetBrains Mono',monospace;font-size:11px;margin-top:16px;white-space:pre-wrap;line-height:1.8}
   .warn-box{margin-bottom:12px;padding:12px 16px;background:rgba(240,192,96,0.07);border:1px solid rgba(240,192,96,0.25);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#c09040;line-height:1.8;white-space:pre-wrap}
   .debug-box{margin-bottom:12px;padding:12px 16px;background:rgba(124,111,247,0.06);border:1px solid rgba(124,111,247,0.2);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#8880cc;line-height:1.8;white-space:pre-wrap}
-  .toggle-row{display:flex;align-items:center;gap:12px;margin-top:16px;padding:14px 18px;background:var(--bg3);border:1px solid var(--border);border-radius:10px}
-  .toggle-label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
-  .toggle-btns{display:flex;gap:6px;margin-left:auto}
-  .toggle-btn{padding:7px 16px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:all 0.15s;font-family:'Inter',sans-serif}
-  .toggle-btn.active-gop{border-color:var(--purple);background:rgba(124,111,247,0.15);color:var(--purple)}
-  .toggle-btn.active-dong{border-color:var(--cyan);background:rgba(56,216,200,0.15);color:var(--cyan)}
 </style>
 </head>
 <body>
@@ -82,7 +76,7 @@
     <div class="sub">A&amp;E Vietnam Thread LLC</div>
     <div class="title">INV / PKL Processor</div>
   </div>
-  <div style="margin-left:auto;font-size:11px;color:#555577;font-family:'JetBrains Mono',monospace">© 2026 hothilan01.</div>
+  <div style="margin-left:auto;font-size:11px;color:#555577;font-family:'JetBrains Mono',monospace">© 2026 hothilan01. All rights reserved.</div>
 </header>
 <div class="container">
   <div class="upload-grid">
@@ -107,20 +101,6 @@
     <button class="btn-process" id="processBtn" onclick="processFiles()" disabled>⚡ &nbsp;XỬ LÝ &amp; TẠO OUTPUT</button>
     <button class="btn-reset" onclick="resetAll()">🗑 &nbsp;RESET</button>
   </div>
-  <div class="toggle-row">
-    <span class="toggle-label">Kiểu xuất</span>
-    <div class="toggle-btns">
-      <button class="toggle-btn active-gop" id="btnGop" onclick="setMode('gop')">⊞ &nbsp;Gộp hàng</button>
-      <button class="toggle-btn" id="btnDong" onclick="setMode('dong')">≡ &nbsp;Theo từng dòng INV</button>
-    </div>
-  </div>
-  <div class="toggle-row" style="margin-top:8px">
-    <span class="toggle-label">Total Yard</span>
-    <div class="toggle-btns">
-      <button class="toggle-btn" id="btnYardOn"  onclick="setYard(true)">✓ &nbsp;Có Yard</button>
-      <button class="toggle-btn active-dong" id="btnYardOff" onclick="setYard(false)">✗ &nbsp;Không</button>
-    </div>
-  </div>
   <div id="loadingBar" style="display:none;margin-top:16px"><div class="loading-bar"></div></div>
   <div id="errorBox" class="error-box" style="display:none"></div>
   <div id="results" class="result-section" style="display:none"></div>
@@ -131,37 +111,7 @@ const BCCT = {"D-CORE H30 TEX60 18/2 5000M": {"hs": "54011090", "name": "Chỉ m
 
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let invFiles = [], pklFiles = [], lastResult = null, exportMode = 'gop', showYard = false;
-
-
-function getTenHang(r) {
-  const base = r.tenHang || r.desc;
-  if (!showYard || !lastResult) return base;
-  const invK1 = (r.key1 || '').split('@').slice(0,2).join('@');
-  const yardMap = lastResult.yardByKey1 || {};
-  const yard = yardMap[invK1] || r.totalYard || 0;
-  console.log('getTenHang invK1='+invK1+' yard='+yard+' keys='+Object.keys(yardMap).slice(0,1));
-  if (!yard) return base;
-  const yardText = Math.round(yard).toLocaleString('en-US') + ' YD';
-  if (/=\s*\d+M,/i.test(base)) {
-    return base.replace(/(=\s*\d+M,)/i, '$1 ' + yardText + ',');
-  }
-  return base + ', ' + yardText;
-}
-
-function setYard(v) {
-  showYard = v;
-  document.getElementById('btnYardOn').className  = 'toggle-btn' + (v  ? ' active-gop' : '');
-  document.getElementById('btnYardOff').className = 'toggle-btn' + (!v ? ' active-dong' : '');
-  if (lastResult) renderResults(lastResult);
-}
-
-function setMode(m) {
-  exportMode = m;
-  document.getElementById('btnGop').className  = 'toggle-btn' + (m==='gop'  ? ' active-gop'  : '');
-  document.getElementById('btnDong').className = 'toggle-btn' + (m==='dong' ? ' active-dong' : '');
-  if (lastResult) renderResults(lastResult);
-}
+let invFiles = [], pklFiles = [], lastResult = null;
 
 function handleFile(type, input) {
   const files = Array.from(input.files);
@@ -255,8 +205,6 @@ function parseINV(wb) {
         if (/A&E\s*item/i.test(s) && !/Customer/i.test(s) && !ic.aeItem) ic.aeItem = i;
         if ((/Customer.*(Item|item)/i.test(s) || /Cust.*Item/i.test(s)) && !/Color/i.test(s) && !/PO/i.test(s) && !ic.custItem) ic.custItem = i;
         if (/Unit\s*Price/i.test(s) && !ic.price)                        ic.price = i;
-        if (/Yrd|yard/i.test(s) && !ic.yrd)                              ic.yrd   = i;
-        if (/^Qty|^Quantity/i.test(s) && !/Yrd|yard|convert/i.test(s) && !ic.qty) ic.qty = i;
       });
       const invHeaderDump = strs.filter(s=>s).map((s,_,__)=>s.replace(/\n/g,'↵')).join(' | ');
       debug.push('INV sheet=' + sn + ' row=' + (hi+1) + ' headers=[' + invHeaderDump + ']');
@@ -268,7 +216,7 @@ function parseINV(wb) {
         const desc  = r2[ic.desc];
         const price = parseFloat(r2[ic.price]);
         if (!desc || !price || price <= 0) continue;
-        const seNo     = String(r2[ic.seNo]     ?? '').trim().substring(0, 8);
+        const seNo     = String(r2[ic.seNo]     ?? '').trim();
         const aeItem   = String(r2[ic.aeItem]   ?? '').trim();
         const custItem = String(r2[ic.custItem] ?? '').trim();
         const key1 = String(desc).trim() + '@' + price;
@@ -280,9 +228,7 @@ function parseINV(wb) {
         k2k1[key2_full] = key1;
         k2k1[key2_no4]  = key1;  // fallback: match even if custItem missing
         k2k1[key2_no34] = key1;  // fallback: match by seNo+desc only
-        const invQty = parseFloat(r2[ic.qty]) || 0;
-        const invYrd = ic.yrd !== undefined ? (parseFloat(r2[ic.yrd]) || 0) : 0;
-        data.push({ seNo, desc: d, aeItem, custItem, price, qty: invQty, yrd: invYrd, key1, key2: key2_full });
+        data.push({ seNo, desc: d, aeItem, custItem, price, key1, key2: key2_full });
       }
       debug.push('INV rows=' + data.length + ' k2k1 entries=' + Object.keys(k2k1).length);
       return { data, k2k1, debug };
@@ -405,20 +351,7 @@ function computeOutput(invResult, pklResult) {
   const { k2k1 } = invResult;
   const debug = [...invResult.debug, ...pklResult.debug];
 
-  // Build yard totals from INV (group by key1)
-  const yardByKey1 = {};
-  invResult.data.forEach(inv => {
-    if (!yardByKey1[inv.key1]) yardByKey1[inv.key1] = 0;
-    if (inv.yrd) {
-      yardByKey1[inv.key1] += inv.yrd;
-    } else {
-      const pm = (inv.desc.match(/(\d+(?:\.\d+)?)\s*M(?:\b|$)/i)||[])[1];
-      if (pm) yardByKey1[inv.key1] += inv.qty * parseFloat(pm);
-    }
-  });
-
   const outputMap = {};
-  const invLineMap = {};
   let matched = 0;
   pklResult.data.forEach(r => {
     // Try full key2 first, then progressively simpler fallbacks
@@ -429,29 +362,12 @@ function computeOutput(invResult, pklResult) {
     if (!invK1) return;
     matched++;
     const key1 = invK1 + '@' + r.country;
-    if (!outputMap[key1]) outputMap[key1] = { qty:0, nw:0, yard:0 };
-    outputMap[key1].qty  += r.qty;
-    outputMap[key1].nw   += r.nw;
-
-    // Per-INV-line: match by seNo + desc + aeItem (custItem vs custItemColor may differ)
-    const pklParts = r.key2.split('_');
-    const pklSeNo  = pklParts[0] || '';
-    const invRow = invResult.data.find(d =>
-      d.seNo === pklSeNo &&
-      d.desc === (pklParts[1] || '') &&
-      d.aeItem === (pklParts[2] || '')
-    );
-    if (invRow) {
-      const lineKey = invRow.seNo + '__' + invRow.aeItem + '__' + invRow.custItem;
-      if (!invLineMap[lineKey]) invLineMap[lineKey] = { ...invRow, invQty: invRow.qty || 0, pklNw: 0 };
-      invLineMap[lineKey].pklNw += r.nw;
-    }
+    if (!outputMap[key1]) outputMap[key1] = { qty:0, nw:0 };
+    outputMap[key1].qty += r.qty;
+    outputMap[key1].nw  += r.nw;
   });
 
   debug.push('Matched=' + matched + ' Output items=' + Object.keys(outputMap).length);
-  Object.entries(yardByKey1).forEach(([k,v]) => {
-    debug.push('YARD: ' + k.substring(0,35) + ' = ' + Math.round(v).toLocaleString('en-US'));
-  });
 
   if (Object.keys(outputMap).length === 0) {
     // Show sample keys for diagnosis
@@ -466,14 +382,6 @@ function computeOutput(invResult, pklResult) {
   const totalCartons = pklResult.totalCartons || 0;
   const totalGW = pklResult.totalGW || 0;
 
-  // Assign yard to outputMap from INV totals
-  Object.keys(outputMap).forEach(k1 => {
-    const invK1part = k1.split('@').slice(0,2).join('@');
-    const yard = yardByKey1[invK1part] || yardByKey1[k1] || 0;
-    outputMap[k1].yard = yard;
-  });
-
-  // Grouped rows
   const rows = Object.entries(outputMap).map(([key1, agg]) => {
     const parts     = key1.split('@');
     const desc      = parts[0].trim();
@@ -485,31 +393,12 @@ function computeOutput(invResult, pklResult) {
       tenHang:   bcct ? bcct.name.replace(/#&VN/g,'').replace(/#&CN/g,'').trim() : '',
       qty:       agg.qty,
       netWeight: agg.nw,
-      totalYard: agg.yard || 0,
-      hasBcct:   !!bcct
-    };
-  });
-
-  // Per-INV-line rows
-  const rowsByLine = Object.values(invLineMap).map(inv => {
-    const bcct = BCCT[inv.desc];
-    return {
-      key1: inv.key1,
-      desc: inv.desc,
-      unitPrice: inv.price,
-      hsCode:    bcct ? bcct.hs  : '',
-      tenHang:   bcct ? bcct.name.replace(/#&VN/g,'').replace(/#&CN/g,'').trim() : '',
-      qty:       inv.invQty,   // Lượng 1 từ INV
-      netWeight: inv.pklNw,   // NW cộng từ PKL
-      totalYard: inv.yrd || 0,
       hasBcct:   !!bcct
     };
   });
 
   return {
     rows,
-    rowsByLine,
-    yardByKey1,
     totalQty: rows.reduce((s,r) => s+r.qty, 0),
     totalNW:  rows.reduce((s,r) => s+r.netWeight, 0),
     totalCartons,
@@ -521,17 +410,15 @@ function computeOutput(invResult, pklResult) {
 // ── Export Excel ──────────────────────────────────────────────────────────────
 function exportExcel() {
   if (!lastResult) return;
-  const rows = exportMode === 'dong' ? (lastResult.rowsByLine || lastResult.rows) : lastResult.rows;
+  const { rows } = lastResult;
   const wb = XLSX.utils.book_new();
   const ws = {};
 
   // Columns: C=Tên hàng, D=HS Code, E=Lượng 1, F=Đơn vị lượng 1, G=Net Weight, H=Đơn vị 2, I=Unit Price, J=Trị giá
   // Data starts at C2 (no header row)
-  console.log('EXPORT showYard='+showYard+' rows[0].key1='+(rows[0]&&rows[0].key1||''));
-  console.log('EXPORT showYard='+showYard+' rows[0].key1='+(rows[0]&&rows[0].key1||''));
   rows.forEach((r, idx) => {
     const row = idx + 2; // start from row 2
-    ws['C' + row] = { t: 's', v: getTenHang(r) };
+    ws['C' + row] = { t: 's', v: r.tenHang };
     ws['D' + row] = { t: 's', v: r.hsCode };
     ws['E' + row] = { t: 'n', v: r.qty };
     ws['F' + row] = { t: 's', v: 'ROL' };
@@ -554,96 +441,6 @@ function exportExcel() {
 }
 
 // ── Process ───────────────────────────────────────────────────────────────────
-
-function exportExcel() {
-  if (!lastResult) return;
-  const rows = exportMode === 'dong' ? (lastResult.rowsByLine || lastResult.rows) : lastResult.rows;
-  const wb = XLSX.utils.book_new();
-  const ws = {};
-
-  // Columns: C=Tên hàng, D=HS Code, E=Lượng 1, F=Đơn vị lượng 1, G=Net Weight, H=Đơn vị 2, I=Unit Price, J=Trị giá
-  // Data starts at C2 (no header row)
-  console.log('EXPORT showYard='+showYard+' rows[0].key1='+(rows[0]&&rows[0].key1||''));
-  console.log('EXPORT showYard='+showYard+' rows[0].key1='+(rows[0]&&rows[0].key1||''));
-  rows.forEach((r, idx) => {
-    const row = idx + 2; // start from row 2
-    ws['C' + row] = { t: 's', v: getTenHang(r) };
-    ws['D' + row] = { t: 's', v: r.hsCode };
-    ws['E' + row] = { t: 'n', v: r.qty };
-    ws['F' + row] = { t: 's', v: 'ROL' };
-    ws['G' + row] = { t: 'n', v: +r.netWeight.toFixed(3) };
-    ws['H' + row] = { t: 's', v: 'KGM' };
-    ws['I' + row] = { t: 'n', v: r.unitPrice };
-    ws['J' + row] = { t: 'n', f: 'E' + row + '*I' + row };
-  });
-
-  // Set sheet range
-  const lastRow = rows.length + 1;
-  ws['!ref'] = 'C2:J' + lastRow;
-  ws['!cols'] = [
-    null, null,                      // A, B empty
-    {wch:80}, {wch:12}, {wch:12}, {wch:10}, {wch:14}, {wch:10}, {wch:16}, {wch:18}
-  ];
-
-  XLSX.utils.book_append_sheet(wb, ws, 'output');
-  XLSX.writeFile(wb, 'book.xlsx');
-}
-
-// ── Process ───────────────────────────────────────────────────────────────────
-
-function renderResults(output) {
-  if (!output) return;
-  const resEl = document.getElementById('results');
-  const activeRows = (exportMode === 'dong' ? (output.rowsByLine || output.rows) : output.rows) || [];
-  const totalQty = output.totalQty || 0;
-  const totalNW  = output.totalNW  || 0;
-  const totalCartons = output.totalCartons || 0;
-  const totalGW      = output.totalGW      || 0;
-  const totalTriGia  = activeRows.reduce((s,r) => s + (r.qty||0) * (r.unitPrice||0), 0);
-  const missingBcct  = activeRows.filter(r => !r.hasBcct);
-
-  const statsHtml = `<div class="stats-grid">
-    <div class="stat-card c-purple"><div class="stat-val">${activeRows.length}</div><div class="stat-label">Mặt hàng</div></div>
-    <div class="stat-card c-cyan"><div class="stat-val">${totalQty.toLocaleString()}</div><div class="stat-label">Tổng Qty (ROL)</div></div>
-    <div class="stat-card c-yellow"><div class="stat-val">${(totalNW||0).toFixed(2)}</div><div class="stat-label">Total NW (KG)</div></div>
-    <div class="stat-card c-green"><div class="stat-val">${(totalGW||0).toFixed(2)}</div><div class="stat-label">Total GW (KG)</div></div>
-    <div class="stat-card c-purple"><div class="stat-val">${totalCartons}</div><div class="stat-label">Total Carton</div></div>
-  </div>`;
-
-  const debugHtml = `<div class="debug-box">🔍 Debug:
-${(output.debug||[]).join('\n')}</div>`;
-  const warnHtml  = missingBcct.length ? `<div class="warn-box">⚠ ${missingBcct.length} mặt hàng chưa có trong BCCT:\n${missingBcct.map(r=>'• '+r.desc).join('\n')}</div>` : '';
-
-  const tableRows = activeRows.map(r => `<tr>
-    <td class="td-desc">${esc(r.desc)}</td>
-    <td class="td-hs">${r.hsCode||'<span class="td-none">—</span>'}</td>
-    <td class="td-num">${r.qty.toLocaleString()}</td>
-    <td class="td-num">${r.netWeight.toFixed(3)}</td>
-    <td style="color:#88bbff;font-family:'JetBrains Mono',monospace;font-size:11px">KGM</td>
-    <td class="td-price">${r.unitPrice.toLocaleString()}</td>
-    <td class="td-trj">${(r.qty*r.unitPrice).toLocaleString('vi-VN')}</td>
-  </tr>`).join('');
-
-  resEl.innerHTML = statsHtml + debugHtml + warnHtml + `
-    <button class="btn-export" onclick="exportExcel()">⬇ &nbsp;EXPORT EXCEL &nbsp;(book.xlsx)</button>
-    <div class="table-wrap"><div class="table-scroll"><table>
-    <thead><tr>
-      <th>Description 1</th><th>HS Code</th>
-      <th>Lượng 1 (ROL)</th><th>Net Weight (KG)</th>
-      <th>Đơn vị 2</th><th>Unit Price (VND)</th><th>Trị giá (VND)</th>
-    </tr></thead>
-    <tbody>${tableRows}</tbody>
-    <tfoot><tr class="tfoot-row">
-      <td class="tfoot-label" colspan="2">TOTAL</td>
-      <td class="td-num">${totalQty.toLocaleString()}</td>
-      <td class="td-num">${totalNW.toFixed(3)}</td>
-      <td></td><td></td>
-      <td class="td-trj">${totalTriGia.toLocaleString('vi-VN')}</td>
-    </tr></tfoot>
-    </table></div></div>`;
-  resEl.style.display = 'block';
-}
-
 async function processFiles() {
   const errEl  = document.getElementById('errorBox');
   const resEl  = document.getElementById('results');
@@ -692,8 +489,51 @@ async function processFiles() {
     const output = computeOutput(invResult, pklResult);
     lastResult = output;
 
-    renderResults(output);
+    const { rows, totalQty, totalNW } = output;
+    const totalTriGia  = rows.reduce((s,r) => s + r.qty * r.unitPrice, 0);
+    const missingBcct  = rows.filter(r => !r.hasBcct);
 
+    const { totalCartons = 0, totalGW = 0 } = output;
+    const statsHtml = `<div class="stats-grid">
+      <div class="stat-card c-purple"><div class="stat-val">${rows.length}</div><div class="stat-label">Mặt hàng</div></div>
+      <div class="stat-card c-cyan"><div class="stat-val">${totalQty.toLocaleString()}</div><div class="stat-label">Tổng Qty (ROL)</div></div>
+      <div class="stat-card c-yellow"><div class="stat-val">${(totalNW||0).toFixed(2)}</div><div class="stat-label">Total NW (KG)</div></div>
+      <div class="stat-card c-green"><div class="stat-val">${(totalGW||0).toFixed(2)}</div><div class="stat-label">Total GW (KG)</div></div>
+      <div class="stat-card c-purple"><div class="stat-val">${totalCartons}</div><div class="stat-label">Total Carton</div></div>
+    </div>`;
+
+    const debugHtml = `<div class="debug-box">🔍 Debug:
+${output.debug.join('\n')}</div>`;
+    const warnHtml  = missingBcct.length ? `<div class="warn-box">⚠ ${missingBcct.length} mặt hàng chưa có trong BCCT:\n${missingBcct.map(r=>'• '+r.desc).join('\n')}</div>` : '';
+
+    const tableRows = rows.map(r => `<tr>
+      <td class="td-desc">${esc(r.desc)}</td>
+      <td class="td-hs">${r.hsCode||'<span class="td-none">—</span>'}</td>
+      <td class="td-num">${r.qty.toLocaleString()}</td>
+      <td class="td-num">${r.netWeight.toFixed(3)}</td>
+      <td style="color:#88bbff;font-family:'JetBrains Mono',monospace;font-size:11px">KGM</td>
+      <td class="td-price">${r.unitPrice.toLocaleString()}</td>
+      <td class="td-trj">${(r.qty*r.unitPrice).toLocaleString('vi-VN')}</td>
+    </tr>`).join('');
+
+    resEl.innerHTML = statsHtml + debugHtml + warnHtml + `
+      <button class="btn-export" onclick="exportExcel()">⬇ &nbsp;EXPORT EXCEL &nbsp;(book.xlsx)</button>
+      <div class="table-wrap"><div class="table-scroll"><table>
+        <thead><tr>
+          <th>Description 1</th><th>HS Code</th>
+          <th>Lượng 1 (ROL)</th><th>Net Weight (KG)</th>
+          <th>Đơn vị 2</th><th>Unit Price (VND)</th><th>Trị giá (VND)</th>
+        </tr></thead>
+        <tbody>${tableRows}</tbody>
+        <tfoot><tr class="tfoot-row">
+          <td class="tfoot-label" colspan="2">TOTAL</td>
+          <td class="td-num">${totalQty.toLocaleString()}</td>
+          <td class="td-num">${totalNW.toFixed(3)}</td>
+          <td></td><td></td>
+          <td class="td-trj">${totalTriGia.toLocaleString('vi-VN')}</td>
+        </tr></tfoot>
+      </table></div></div>`;
+    resEl.style.display = 'block';
 
   } catch(e) {
     errEl.textContent = '❌ ' + e.message;
@@ -704,34 +544,6 @@ async function processFiles() {
 }
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-// ── Visitor Tracker ───────────────────────────────────────────────────────────
-(async function() {
-  try {
-    const BOT_TOKEN = 'YOUR_BOT_TOKEN';  // thay bằng token bot của bạn
-    const CHAT_ID   = 'YOUR_CHAT_ID';    // thay bằng chat ID của bạn
-
-    // Get visitor info
-    const ip  = await fetch('https://api.ipify.org?format=json').then(r=>r.json()).then(d=>d.ip).catch(()=>'unknown');
-    const geo = await fetch('https://ipapi.co/'+ip+'/json/').then(r=>r.json()).catch(()=>{});
-
-    const msg = [
-      '🔔 *Có người vào tool!*',
-      '🌐 URL: ' + window.location.href,
-      '🕐 Time: ' + new Date().toLocaleString('vi-VN', {timeZone:'Asia/Ho_Chi_Minh'}),
-      '📍 IP: ' + ip,
-      '🗺 Location: ' + (geo?.city||'?') + ', ' + (geo?.country_name||'?'),
-      '💻 Device: ' + navigator.userAgent.split(')')[0].split('(')[1],
-    ].join('\n');
-
-    await fetch('https://api.telegram.org/bot'+BOT_TOKEN+'/sendMessage', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ chat_id: CHAT_ID, text: msg, parse_mode: 'Markdown' })
-    });
-  } catch(e) {}
-})();
-
 </script>
 </body>
 </html>
